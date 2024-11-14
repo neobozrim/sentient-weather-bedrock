@@ -9,6 +9,8 @@ import json
 import os
 import time
 import requests
+import base64
+import random
 from datetime import datetime, timedelta
 from flask import url_for
 from werkzeug.utils import secure_filename
@@ -244,7 +246,7 @@ def generate_color_palette(city, weather_data, weather_description):
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
         return None
-        
+
 def get_default_fonts():
     """Return default font configuration when font generation fails"""
     return {
@@ -470,7 +472,7 @@ def generate_font_recommendations(city: str, weather_data: Dict) -> Optional[Dic
 
 
 def generate_city_image(city, weather_description):
-    """Generate or retrieve a cached city image based on city and weather description."""
+    """Generate or retrieve a cached city image using AWS Bedrock's Stable Diffusion XL 1.0."""
     try:
         # Define directories for static images and cache
         project_root = os.path.abspath(os.path.dirname(__file__))
@@ -498,8 +500,8 @@ def generate_city_image(city, weather_description):
                     print(f"Using cached image for {city} with {weather_description}")
                     return image_path
 
-        # Initialize the OpenAI client for image generation
-        client = OpenAI()
+        # Initialize Bedrock client
+        bedrock = boto3.client('bedrock-runtime')
 
         # Generate a unique filename for the image
         timestamp = int(time.time())
@@ -524,22 +526,46 @@ def generate_city_image(city, weather_description):
                 except Exception as e:
                     print(f"Error removing old file {old_image}: {str(e)}")
 
-        # Generate the image using OpenAI's DALL-E API
-        prompt = f"An oil painting of the most iconic scenery from {city} where the weather is {weather_description}."
-        response = client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size="1792x1024",
-            quality="standard",
-            n=1,
-        )
+        # Prepare the prompt for SDXL
+        prompt = f"An oil painting of the most iconic scenery from {city} where the weather is {weather_description} in an abstract, textured style with rough, expressive brushstrokes"
+        negative_prompt = "text, watermark, signature, blurry, distorted, low quality, deformed"
 
-        # Check the response and download the image
-        image_url = response.data[0].url
-        img_response = requests.get(image_url)
-        if img_response.status_code == 200:
+        # Prepare request body for SDXL
+        request_body = {
+            "text_prompts": [
+                {
+                    "text": prompt,
+                    "weight": 1.0
+                },
+                {
+                    "text": negative_prompt,
+                    "weight": -1.0
+                }
+            ],
+            "cfg_scale": 7.0,
+            "seed": random.randint(0, 4294967295),
+            "steps": 50,
+            "width": 1024,
+            "height": 1024,
+            "style_preset": "photographic",
+            "image_strength": 0.75
+        }
+
+        # Call Bedrock's SDXL model
+        try:
+            response = bedrock.invoke_model(
+                modelId='stability.stable-diffusion-xl-v1',
+                body=json.dumps(request_body)
+            )
+            
+            response_body = json.loads(response.get('body').read())
+            
+            # SDXL returns base64 encoded image
+            image_data = base64.b64decode(response_body['artifacts'][0]['base64'])
+            
+            # Save the image
             with open(image_path, 'wb') as f:
-                f.write(img_response.content)
+                f.write(image_data)
 
             # Create relative path for serving the image
             relative_path = f'/static/images/{filename}'
@@ -556,10 +582,16 @@ def generate_city_image(city, weather_description):
 
             print(f"Generated new image for {city} with {weather_description}")
             return relative_path
-        else:
-            print(f"Failed to download image: Status code {img_response.status_code}")
+
+        except ClientError as e:
+            print(f"Bedrock API error: {str(e)}")
+            print(f"Error code: {e.response['Error']['Code']}")
+            print(f"Error message: {e.response['Error']['Message']}")
             return None
 
     except Exception as e:
         print(f"Error generating city image: {str(e)}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return None
