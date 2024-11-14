@@ -376,11 +376,12 @@ def get_css_variables(fonts):
 
 def generate_font_recommendations(city: str, weather_data: Dict) -> Optional[Dict]:
     """
-    Generate font recommendations for a city based on its unique characteristics and current weather.
+    Generate font recommendations for a city based on its unique characteristics and current weather using AWS Bedrock's Claude 3.5.
     Returns a dictionary with font families and their weights/styles.
     """
     try:
-        client = Anthropic()
+        # Initialize Bedrock client
+        bedrock = boto3.client('bedrock-runtime')
         
         # Extract relevant weather data
         current_weather = weather_data['current']
@@ -406,32 +407,43 @@ def generate_font_recommendations(city: str, weather_data: Dict) -> Optional[Dic
         2. secondary_heading: For weather condition descriptions and daily forecasts
         3. body_text: For detailed weather information
         4. accent_text: For small labels and secondary information
+        
+        Requirements for response format:
+        - Must be valid JSON
+        - Use ONLY these keys: primary_heading, secondary_heading, body_text, accent_text
+        - Each value should be an object with these exact keys:
+          * family: string (font family name)
+          * weight: string (font weight, e.g. "400", "700")
+          * style: string (e.g. "normal", "italic")
+          * fallback: string (fallback font category)
+        - Do not include any explanation or other text
         """
 
-        messages = [{
-            "role": "user",
-            "content": f"""{prompt}
-            Requirements for response format:
-            - Must be valid JSON
-            - Use ONLY these keys: primary_heading, secondary_heading, body_text, accent_text
-            - Each value should be an object with these exact keys:
-              * family: string (font family name)
-              * weight: string (font weight, e.g. "400", "700")
-              * style: string (e.g. "normal", "italic")
-              * fallback: string (fallback font category)
-            - Do not include any explanation or other text
-            """
-        }]
+        # Prepare the request body for Claude 3.5
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": 1024,
+            "temperature": 0.7
+        }
 
-        response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
-            temperature=0.7,
-            messages=messages
+        # Call Bedrock's Claude 3.5
+        response = bedrock.invoke_model(
+            modelId='anthropic.claude-3-sonnet-20240229-v1:0',
+            body=json.dumps(body)
         )
 
-        # Parse and validate the response
-        font_data = json.loads(response.content[0].text)
+        # Parse the response
+        response_body = json.loads(response.get('body').read())
+        completion = response_body.get('content')[0].get('text')
+        
+        # Parse and validate the font data
+        font_data = json.loads(completion)
         print("Font API Response:", font_data)
         
         # Validate required keys
@@ -445,12 +457,13 @@ def generate_font_recommendations(city: str, weather_data: Dict) -> Optional[Dic
                 if prop not in font_data[category]:
                     raise ValueError(f"Missing property {prop} in {category}")
 
-        # Removed the following lines:
-        # font_families = {data['family'] for data in font_data.values()}
-        # font_data['google_fonts_url'] = generate_google_fonts_url(font_families)
-        
         return font_data
 
+    except ClientError as e:
+        print(f"AWS Bedrock API error: {str(e)}")
+        print(f"Error code: {e.response['Error']['Code']}")
+        print(f"Error message: {e.response['Error']['Message']}")
+        return None
     except Exception as e:
         print(f"Error generating font recommendations: {str(e)}")
         return None
