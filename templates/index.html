@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentient Weather</title>
+
+    {% if fonts %}
+      <!-- Debug output -->
+    <script>
+        console.log('Fonts data:', {{ fonts | tojson }});
+        console.log('Font CSS vars:', {{ font_css_vars | tojson }});
+    </script>
+
+    <!-- Load Google Fonts -->
+    <link rel="stylesheet" href="{{ fonts.google_fonts_url }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+            <!-- Inject dynamic font styles -->
+        <style>
+        :root {
+            /* Font families */
+            --font-primary-heading: '{{ fonts.primary_heading.family }}', {{ fonts.primary_heading.fallback }};
+            --font-secondary-heading: '{{ fonts.secondary_heading.family }}', {{ fonts.secondary_heading.fallback }};
+            --font-body-text: '{{ fonts.body_text.family }}', {{ fonts.body_text.fallback }};
+            --font-accent-text: '{{ fonts.accent_text.family }}', {{ fonts.accent_text.fallback }};
+            
+            /* Font weights */
+            --font-weight-primary-heading: {{ fonts.primary_heading.weight }};
+            --font-weight-secondary-heading: {{ fonts.secondary_heading.weight }};
+            --font-weight-body-text: {{ fonts.body_text.weight }};
+            --font-weight-accent-text: {{ fonts.accent_text.weight }};
+            
+            /* Font styles */
+            --font-style-primary-heading: {{ fonts.primary_heading.style }};
+            --font-style-secondary-heading: {{ fonts.secondary_heading.style }};
+            --font-style-body-text: {{ fonts.body_text.style }};
+            --font-style-accent-text: {{ fonts.accent_text.style }};
+        }
+        </style>
+        {% endif %}
+
+    <!-- Debug styles for testing -->
+    <style>
+        .font-test {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        
+        .test-primary {
+            font-family: {{ fonts.primary_heading.family }}, {{ fonts.primary_heading.fallback }};
+            font-weight: {{ fonts.primary_heading.weight }};
+            font-style: {{ fonts.primary_heading.style }};
+        }
+        
+        .test-secondary {
+            font-family: {{ fonts.secondary_heading.family }}, {{ fonts.secondary_heading.fallback }};
+            font-weight: {{ fonts.secondary_heading.weight }};
+            font-style: {{ fonts.secondary_heading.style }};
+        }
+
+        .test-body {
+            font-family: {{ fonts.body_text.family }}, {{ fonts.body_text.fallback }};
+            font-weight: {{ fonts.body_text.weight }};
+            font-style: {{ fonts.body_text.style }};
+        }
+
+        .test-accent {
+            font-family: {{ fonts.accent_text.family }}, {{ fonts.accent_text.fallback }};
+            font-weight: {{ fonts.accent_text.weight }};
+            font-style: {{ fonts.accent_text.style }};
+        }
+    </style>
+ 
+
+    
+    {% if colors %}
+    <style>
+        :root {
+            --weather-background: {{ colors.color_page_background }};
+            --weather-tiles-container: {{ colors.color_tiles_container }};
+            --weather-tiles: {{ colors.color_tiles }};
+            --weather-tile-heading: {{ colors.color_tile_heading }};
+            --weather-tile-temp-high: {{ colors.color_tile_temp_high }};
+            --weather-tile-temp-low: {{ colors.color_tile_temp_low }};
+            --weather-tile-details: {{ colors.color_tile_weather_details }};
+        }
+    </style>
+    {% endif %}
+</head>
+<body {% if colors %}data-weather-colors="true"{% endif %}>
+    <div class="container">
+        <header class="app-header">
+            <div class="logo">
+                <svg class="logo-icon" viewbox="0 0 100 100" width="32" height="32">
+                    <path d="M 30 35 C 35 35, 40 30, 40 40 C 40 50, 35 55, 40 60" 
+                          stroke="currentColor" 
+                          stroke-width="10" 
+                          stroke-linecap="round" 
+                          fill="none" />
+                    <path d="M 45 45 C 50 45, 55 40, 55 50 C 55 60, 50 65, 55 70" 
+                          stroke="currentColor" 
+                          stroke-width="10" 
+                          stroke-linecap="round" 
+                          fill="none" />
+                </svg>
+                <h1>Sentient Weather</h1>
+            </div>
+            <form class="search-form" method="POST">
+                <input type="text" name="city" placeholder="Enter city name" required>
+                <button type="submit">Get Weather</button>
+            </form>
+             
+        </header>
+
+        <main class="content" role="main">
+            {% if error %}
+            <div class="result-container">
+                <div class="section hero-section">
+                    <img src="{{ url_for('static', filename='placeholders/error.png') }}" alt="Error" class="city-image">
+                    <div class="weather-overlay">
+                        <div class="weather-content">
+                            <div class="weather-main">
+                                <h2>Error</h2>
+                                <div class="temperature-display">
+                                    <span class="weather-condition">{{ error }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if weather_data %}
+                {% if not image_path %}
+                <div class="error-container">
+                    <img src="{{ url_for('static', filename='placeholders/error.png') }}" 
+                         alt="Image Unavailable" 
+                         class="error-image">
+                    <div class="error-message">
+                        Unable to generate city visualization
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="result-container">
+                    <div class="section hero-section">
+                        {% if image_path %}
+                        <img src="{{ image_path }}" alt="Generated visualization" class="city-image">
+                        {% endif %}
+                        <div class="weather-overlay">
+                            <div class="weather-content">
+                                <div class="weather-main">
+                                    <h2 class="primary-heading">{{ city }}</h2>
+                                    <div class="temperature-display">
+                                        <span class="current-temp primary-heading">
+                                            {{ "%.1f"|format(weather_data.current.temperature) }}°C
+                                        </span>
+                                        <span class="weather-condition secondary-heading">{{ weather_description }}</span>
+                                    </div>
+                                </div>
+                                <div class="weather-details">
+                                    <div class="detail-item">
+                                        <span class="detail-label secondary-heading">Cloud Cover</span>
+                                        <span class="detail-value secondary-heading">{{ "%.1f"|format(weather_data.current.cloud_cover) }}%</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label secondary-heading">Wind Speed</span>
+                                        <span class="detail-value secondary-heading">{{ "%.1f"|format(weather_data.current.wind_speed) }} m/s</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section forecast-section">
+                        <div class="forecast-container">
+                            {% for day in weather_data.forecast[:3] %}
+                            <div class="forecast-card">
+                                <div class="weather-icon"></div>
+                                <h3 class="day-label body-text">
+                                    {% if loop.index == 1 %}
+                                        Today
+                                    {% else %}
+                                        {{ day.date.strftime('%A') }}
+                                    {% endif %}
+                                </h3>
+                                <div class="temp-range accent-text">
+                                    <span class="temp-high">{{ "%.1f"|format(day.temperature_max) }}°</span>
+                                    <span class="temp-low">{{ "%.1f"|format(day.temperature_min) }}°</span>
+                                </div>
+                                <div class="conditions accent-text">
+                                    <span class="condition-item">{{ "%.1f"|format(day.precipitation_sum) }}mm</span>
+                                    <span class="condition-item">{{ "%.1f"|format(weather_data.current.wind_speed) }} m/s</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% if colors %}
+                    <div class="color-swatches">
+                        <div class="color-swatch" style="background-color: {{ colors.color_page_background }}" title="Page Background"></div>
+                        <div class="color-swatch" style="background-color: {{ colors.color_tiles_container }}" title="Tiles Container"></div>
+                        <div class="color-swatch" style="background-color: {{ colors.color_tiles }}" title="Tiles"></div>
+                    </div>
+                    {% endif %}
+                    {% if fonts %}
+                    <!-- Add this somewhere visible in your template for testing -->
+                    <div class="font-test">
+                        <h3>Font Test Panel</h3>
+                        <p class="test-primary">Primary Heading Font: {{ fonts.primary_heading.family }}</p>
+                        <p class="test-secondary">Secondary Heading Font: {{ fonts.secondary_heading.family }}</p>
+                        <p class="test-body">Body Text Font: {{ fonts.body_text.family }}</p>
+                        <p class="test-accent">Accent Text Font: {{ fonts.accent_text.family }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="result-container">
+                    <div class="section hero-section">
+                        <img src="{{ url_for('static', filename='placeholders/placeholder.png') }}" 
+                             alt="Welcome to Sentient Weather" 
+                             class="city-image">
+                        <div class="weather-overlay">
+                            <div class="weather-content">
+                                <div class="weather-main">
+                                    <h2>Welcome to Sentient Weather</h2>
+                                    <div class="temperature-display">
+                                        <span class="weather-condition">Enter a city name to get started</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>
