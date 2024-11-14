@@ -125,6 +125,8 @@ def get_weather_description(weather_code):
 def generate_color_palette(city, weather_data, weather_description):
     """Generate color palette using AWS Bedrock's Claude 3.5."""
     try:
+        print("Starting color palette generation with Bedrock")  # Add this line
+        print(f"AWS Region: {os.getenv('AWS_DEFAULT_REGION')}")  # And this line
         print(f"Generating palette for: {city}")
         print(f"Weather data received: {weather_data}")
         print(f"Weather description: {weather_description}")
@@ -234,6 +236,8 @@ def generate_color_palette(city, weather_data, weather_description):
 def generate_font_recommendations(city: str, weather_data: Dict) -> Optional[Dict]:
     """Generate font recommendations using AWS Bedrock's Claude 3.5."""
     try:
+        print("Starting font recommendations with Bedrock")  # Add this line
+        print(f"AWS Region: {os.getenv('AWS_DEFAULT_REGION')}")  # And this line
         bedrock = boto3.client('bedrock-runtime')
         
         current_weather = weather_data['current']
@@ -308,6 +312,8 @@ def generate_font_recommendations(city: str, weather_data: Dict) -> Optional[Dic
 def generate_city_image(city, weather_description):
     """Generate or retrieve a cached city image using AWS Bedrock's SDXL."""
     try:
+        print("Starting image generation with Bedrock SDXL")  # Add this line
+        print(f"AWS Region: {os.getenv('AWS_DEFAULT_REGION')}")  # And this line
         project_root = os.path.abspath(os.path.dirname(__file__))
         static_dir = os.path.join(project_root, 'static', 'images')
         os.makedirs(static_dir, exist_ok=True)
